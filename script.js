@@ -1,6 +1,4 @@
 
-
-
 class KMeans {
     constructor(K = 5, maxIters = 100) {
         this.K = K;
@@ -14,15 +12,13 @@ class KMeans {
         return Math.sqrt(x1.reduce((sum, xi, i) => sum + (xi - x2[i]) ** 2, 0));
     }
 
-
-
     closestCentroid(sample, centroids) {
         const distances = centroids.map(centroid => KMeans.euclideanDistance(sample, centroid));
         return distances.indexOf(Math.min(...distances));
     }
 
     createClusters(centroids) {
-        const clusters = Array.from({ length: this.K }, () => []);  
+        const clusters = Array.from({ length: this.K }, () => []);
         this.X.forEach((sample, idx) => {
             const closestIdx = this.closestCentroid(sample, centroids);
             clusters[closestIdx].push(idx);
@@ -42,28 +38,25 @@ class KMeans {
 
     isConverged(centroidsOld, centroidsNew) {
         return centroidsOld.every((oldCentroid, i) => 
-            KMeans.euclideanDistance(oldCentroid, centroidsNew[i]) === 0);
+            KMeans.euclideanDistance(oldCentroid, centroidsNew[i]) < 1e-6);  // Threshold for convergence
     }
-
 
     //hlavna funkcia
     predict(X) {
         this.X = X; //datas
-        this.nSamples = X.length;//kolko je prvkov
-        this.nFeatures = X[0].length;//kolko prvkov dat v jednom
+        this.nSamples = X.length; //kolko je prvkov
+        this.nFeatures = X[0].length; //kolko prvkov dat v jednom
 
-        
         const randomIndices = new Set();   //Set() pre ne opakovanie
         while (randomIndices.size < this.K) {
             randomIndices.add(Math.floor(Math.random() * this.nSamples));
         }
         this.centroids = [...randomIndices].map(idx => X[idx]);
 
-        
         for (let i = 0; i < this.maxIters; i++) { //pokial ne dosahne max pokus interaci
             this.clusters = this.createClusters(this.centroids); 
             const newCentroids = this.getCentroids(this.clusters);
-            if (this.isConverged(this.centroids, newCentroids)){ 
+            if (this.isConverged(this.centroids, newCentroids)) {
                 break;
             }
             this.centroids = newCentroids; //pridat novy centr
@@ -81,9 +74,6 @@ class KMeans {
         });
         return labels;
     }
-
-  
-    
 }
 
 // Test
@@ -93,16 +83,18 @@ function generateTestData() {
         [10, 11], [11, 13], [1, 0], [0, 1]
     ];
 }
+
+// Example data (cars)
 const cars = [
     [0,150, 1300, 500], // Car 1: 150 HP, 1300 kg
     [0,200, 1600, 300], // Car 2: 200 HP, 1600 kg
-    [3,100, 1100, 400], // Car 3: 100 HP, 1100 kg
+    [1,100, 1100, 400], // Car 3: 100 HP, 1100 kg
     [1,400, 2000, 700], // Car 4: 400 HP, 2000 kg (sports car)
-    [1,450, 2200, 800], // Car 5: 450 HP, 2200 kg (sports car)
+    [2,450, 2200, 800], // Car 5: 450 HP, 2200 kg (sports car)
 ];
 
-const kmeans = new KMeans(10, 100);
-//console.log(kmeans.clusters);
+const kmeans = new KMeans(3, 100);
 const labels = kmeans.predict(generateTestData());
 console.log("labels:", labels);
+
 //omoe
