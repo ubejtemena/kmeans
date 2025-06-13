@@ -2,12 +2,125 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kmeans</title>
+    <title>K-means</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #282730; color: #dbdbdd; }    
+        .result { margin-top: 20px; white-space: pre-wrap; }
+        .chart-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .chart-image {
+            max-width: 100%;
+            border-radius: 15px;
+            padding: 5px;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+            font-style: bold;
+            text-align:center;
+        }
+        
+        h1 {
+            text-align: center;
+            
+        }
+        
+        .inputcsv{
+            font-size: 1.5rem;
+            
+        }
+        .inputfile{
+           color: violet;
+        }
+        .kvalue{
+        font-size: 1.5rem;
+        }
+        #kValue{
+        width: 75px;
+        height: 35px;
+        font-size: 1.5em;
+        margin-left:5px;
+        }
+
+    </style>
 </head>
 <body>
-    
+    <h1>K-means</h1>
+    <div style="display:flex; justify-content:center">
+      <div style="align-items:center">
+    <div>
+        <label class="inputcsv" for="csvFile">CSV File:</label>
+        <input class = "inputfile" type="file" id="csvFile">
+    </div>
+    <div style="margin-top: 10px;">
 
+        <label class="kvalue" for="kValue">Number of Clusters (K):</label>
+        <input type="number" id="kValue" value="3" min="1">
+    </div>
+
+    <div style="margin-top: 10px; margin-left: 100px">
+        <button style="width: 150px; height: 50px; font-size: 1.5rem; border-radius:7px;" onclick="processFile()">Run</button>
+    </div>
+
+    <div id="loading" class="loading">Processing... Please wait.</div>
+    </div>
+      </div>
+    <div id="chartContainer" class="chart-container">  
+        </div>
     
+    <!--<div class="result" id="result"></div> -->
+    
+    <script>
+        function processFile() {
+            const fileInput = document.getElementById('csvFile');
+            const kValue = document.getElementById('kValue').value;
+            const resultDiv = document.getElementById('result');
+            const chartContainer = document.getElementById('chartContainer');
+            const loadingDiv = document.getElementById('loading');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Please select a CSV file';
+                return;
+            }
+            
+            loadingDiv.style.display = 'block';
+            chartContainer.innerHTML = '';
+            
+            const formData = new FormData();
+            formData.append('csvFile', fileInput.files[0]);
+            formData.append('k', kValue);
+            formData.append('maxIters', 100);
+            
+            fetch('http://localhost:3000/api/kmeans', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('K-means results:', data);
+                
+                loadingDiv.style.display = 'none';
+                
+                //resultDiv.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.chartUrl) {
+                    const img = document.createElement('img');
+                    img.src = data.chartUrl;
+                    img.alt = 'K-means Clustering Chart';
+                    img.className = 'chart-image';
+                    
+                    chartContainer.innerHTML = '';
+                    chartContainer.appendChild(img);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //resultDiv.textContent = 'Error: ' + error.message;
+                loadingDiv.style.display = 'none';
+            });
+        }
+    </script>
 </body>
 </html>

@@ -1,100 +1,197 @@
+// funkcia na výpočet Euklidovskej vzdialenosti
+function euclideanDistance(x1, x2) {
+  return Math.sqrt(
+    x1.reduce((sum, val, i) => sum + Math.pow(val - x2[i], 2), 0)
+  );
+}
 
 class KMeans {
-    constructor(K = 5, maxIters = 100) {
-        this.K = K;
-        this.maxIters = maxIters;
-        this.clusters = Array.from({ length: K }, () => []);
-        this.centroids = [];
-    }
+  constructor(K = 5, maxIters = 100, plotSteps = false) {
+    this.K = K;
+    this.maxIters = maxIters;
+    this.plotSteps = plotSteps;
+    this.clusters = Array(this.K).fill().map(() => []);
+    this.centroids = [];
+  }
+//////////////////////////////////////////////////////////////
 
-    //formula pre distanciu medzi dvoma dotkami
-    static euclideanDistance(x1, x2) {
-        return Math.sqrt(x1.reduce((sum, xi, i) => sum + (xi - x2[i]) ** 2, 0));
-    }
 
-    closestCentroid(sample, centroids) {
-        const distances = centroids.map(centroid => KMeans.euclideanDistance(sample, centroid));
-        return distances.indexOf(Math.min(...distances));
+  predict(X) {
+    this.X = X;
+    this.nSamples = X.length;
+    this.nFeatures = X[0].length;
+    
+    const randomSampleIdxs = this._getRandomIndices(this.nSamples, this.K);
+    this.centroids = randomSampleIdxs.map(idx => this.X[idx]);
+    
+    // Optimalizácia klastrov
+    for (let i = 0; i < this.maxIters; i++) {
+      // Vytvorenie klastrov
+      this.clusters = this._createClusters(this.centroids);
+     
+      // Vypocet nových centroidov
+      const centroidsOld = JSON.parse(JSON.stringify(this.centroids));
+      this.centroids = this._getCentroids(this.clusters);
+      
+      if (this._isConverged(centroidsOld, this.centroids)) {
+        break;
+      }
     }
+    
+    return this._getClusterLabels(this.clusters);
+  }
 
-    createClusters(centroids) {
-        const clusters = Array.from({ length: this.K }, () => []);
-        this.X.forEach((sample, idx) => {
-            const closestIdx = this.closestCentroid(sample, centroids);
-            clusters[closestIdx].push(idx);
+
+/////////////////////////////////////////////////////////////
+
+  _getRandomIndices(max, count) { // Nahodne centroidy
+    const indices = new Set();
+    while (indices.size < count) {
+      indices.add(Math.floor(Math.random() * max));
+    }
+    return Array.from(indices);
+  }
+
+
+
+
+  _closestCentroid(sample, centroids) { // Najblizsi centroid
+
+    // Vzdialenosť od kazdeho centroidu
+    const distances = centroids.map(point => euclideanDistance(sample, point));
+    
+    let minIdx = 0;
+    let minDist = distances[0];
+    
+    for (let i = 1; i < distances.length; i++) {
+      if (distances[i] < minDist) {
+        minDist = distances[i];
+        minIdx = i;
+      }
+    }
+    
+    return minIdx;
+  }
+
+
+
+  _createClusters(centroids) { // Priradi data k najblizsiemu centroidu
+    const clusters = Array(this.K).fill().map(() => []);
+    
+    this.X.forEach((sample, idx) => {
+      const centroidIdx = this._closestCentroid(sample, centroids);
+      clusters[centroidIdx].push(idx);
+    });
+    
+    return clusters;
+  }
+
+  
+  
+  
+  _getCentroids(clusters) { // Nove centroidy
+
+    // Priradenie avg klastrov centroidom
+    const centroids = Array(this.K).fill().map(() => Array(this.nFeatures).fill(0));
+    
+    clusters.forEach((cluster, clusterIdx) => {
+      if (cluster.length === 0) return;
+      
+      const clusterMean = Array(this.nFeatures).fill(0);
+      
+      cluster.forEach(sampleIdx => {
+        const sample = this.X[sampleIdx];
+        sample.forEach((val, featureIdx) => {
+          clusterMean[featureIdx] += val;
         });
-        return clusters;
-    }
+      });
+      
+      clusterMean.forEach((sum, featureIdx) => {
+        centroids[clusterIdx][featureIdx] = sum / cluster.length;
+      });
+    });
+    
+    return centroids;
+  }
+  
 
-    getCentroids(clusters) {
-        return clusters.map((cluster, clusterIdx) => {
-            if (cluster.length === 0) return this.centroids[clusterIdx];
-            
-            return Array.from({ length: this.nFeatures }, (_, colIdx) => 
-                cluster.reduce((sum, sampleIdx) => sum + this.X[sampleIdx][colIdx], 0) / cluster.length
-            );
-        });
-    }
 
-    isConverged(centroidsOld, centroidsNew) {
-        return centroidsOld.every((oldCentroid, i) => 
-            KMeans.euclideanDistance(oldCentroid, centroidsNew[i]) < 1e-6);  // Threshold for convergence
-    }
 
-    //hlavna funkcia
-    predict(X) {
-        this.X = X; //datas
-        this.nSamples = X.length; //kolko je prvkov
-        this.nFeatures = X[0].length; //kolko prvkov dat v jednom
 
-        const randomIndices = new Set();   //Set() pre ne opakovanie
-        while (randomIndices.size < this.K) {
-            randomIndices.add(Math.floor(Math.random() * this.nSamples));
-        }
-        this.centroids = [...randomIndices].map(idx => X[idx]);
+  _isConverged(centroidsOld, centroids) { // Stabilny stav?
 
-        for (let i = 0; i < this.maxIters; i++) { //pokial ne dosahne max pokus interaci
-            this.clusters = this.createClusters(this.centroids); 
-            const newCentroids = this.getCentroids(this.clusters);
-            if (this.isConverged(this.centroids, newCentroids)) {
-                break;
-            }
-            this.centroids = newCentroids; //pridat novy centr
-        }
+    // Vzdialenosti medzi starými a novými centroidmi
+    const distances = centroidsOld.map((oldCentroid, i) => 
+      euclideanDistance(oldCentroid, centroids[i])
+    );
+    
+    return distances.reduce((a, b) => a + b, 0) === 0;
+  }
 
-        return this.getClusterLabels(this.clusters); // dava label na clastery
-    }
 
-    getClusterLabels(clusters) {
-        const labels = new Array(this.nSamples).fill(-1);
-        clusters.forEach((cluster, clusterIdx) => {
-            cluster.forEach(sampleIdx => {
-                labels[sampleIdx] = clusterIdx;
-            });
-        });
-        return labels;
-    }
+
+
+
+_getClusterLabels(clusters) {
+    const labels = new Array(this.nSamples).fill(0);
+    
+    clusters.forEach((cluster, clusterIdx) => {
+      cluster.forEach(sampleIdx => {
+        labels[sampleIdx] = clusterIdx;
+      });
+    });
+    
+    return labels;
+  }
+
 }
 
-// Test
-function generateTestData() {
-    return [
-        [1, 2], [2, 3], [3, 3], [5, 8], [8, 8], [9, 10],
-        [10, 11], [11, 13], [1, 0], [0, 1]
-    ];
+
+
+
+function parseCSVAndEncodeCategorical(csvText) {
+  const lines = csvText.trim().split('\n');
+  const hasHeader = isNaN(parseFloat(lines[0].split(',')[0]));
+  let header = null;
+  let startIdx = 0;
+
+  if (hasHeader) {
+    header = lines[0].split(',').map(h => h.trim());
+    startIdx = 1;
+  }
+
+  const rawRows = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    if (lines[i].trim() === '') continue;
+    rawRows.push(lines[i].split(',').map(val => val.trim()));
+  }
+
+  const columns = rawRows[0].map((_, colIndex) => rawRows.map(row => row[colIndex]));
+
+  const encodedColumns = columns.map(col => {
+    if (col.every(val => !isNaN(parseFloat(val)))) {
+      return col.map(val => parseFloat(val));
+    } else {
+      const map = {};
+      let currentCode = 0;
+      return col.map(val => {
+        if (!(val in map)) {
+          map[val] = currentCode++;
+        }
+        return map[val];
+      });
+    }
+  });
+
+  const data = encodedColumns[0].map((_, rowIndex) =>
+    encodedColumns.map(col => col[rowIndex])
+  );
+
+  return { data, header };
 }
 
-// Example data (cars)
-const cars = [
-    [0,150, 1300, 500], // Car 1: 150 HP, 1300 kg
-    [0,200, 1600, 300], // Car 2: 200 HP, 1600 kg
-    [1,100, 1100, 400], // Car 3: 100 HP, 1100 kg
-    [1,400, 2000, 700], // Car 4: 400 HP, 2000 kg (sports car)
-    [2,450, 2200, 800], // Car 5: 450 HP, 2200 kg (sports car)
-];
+module.exports = {
+  KMeans,
+  parseCSV: parseCSVAndEncodeCategorical
+}
 
-const kmeans = new KMeans(3, 100);
-const labels = kmeans.predict(generateTestData());
-console.log("labels:", labels);
-
-//omoe
